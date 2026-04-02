@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Secure Hacker Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+body {
+  background: radial-gradient(circle, #000000, #001a1a);
+  color: #00ffcc;
+  font-family: 'Share Tech Mono', monospace;
+  text-align: center;
+  margin: 0;
+}
+
+.container {
+  width: 90%;
+  max-width: 500px;
+  margin: auto;
+  margin-top: 50px;
+  padding: 22px;
+  border: 1px solid #00ffcc;
+  border-radius: 14px;
+  box-shadow: 0 0 25px #00ffcc44;
+}
+
+h2 { text-shadow: 0 0 10px #00ffcc; }
+.sub { font-size: 18px; opacity: 0.7; margin-bottom: 10px; }
+
+#loginBox, #mainPage, #adminPage { display: none; }
+
+input {
+  width: 90%; padding: 12px; margin: 10px 0;
+  background: black; border: 1px solid #00ffcc;
+  color: #00ffcc; border-radius: 6px;
+}
+
+button {
+  width: 95%; padding: 12px; margin-top: 10px;
+  background: black; border: 1px solid #00ffcc;
+  color: #00ffcc; cursor: pointer;
+}
+
+#error { color: #ff6b6b; font-size: 12px; }
+
+#resultTable {
+  width: 100%; margin-top: 20px;
+  border-collapse: collapse; font-size: 14px;
+}
+
+#resultTable th, #resultTable td {
+  border: 1px solid #00ffcc;
+  padding: 8px;
+}
+
+ul { list-style: none; padding: 0; }
+
+li {
+  display: flex; justify-content: space-between;
+  padding: 5px; border-bottom: 1px solid #00ffcc;
+}
+</style>
+</head>
+<body>
+
+<div id="loginBox" class="container">
+  <h2> SECURE LOGIN </h2>
+  <p class="sub">Authorized Access Only</p>
+  <p class="sub">To request access, connect via <a href="https://t.me/+5z_vqYYhRc1jMTQ1" target="_blank" style="color:#00ffcc; text-decoration:underline;">Telegram</a></p>
+
+
+  <input type="text" id="username" placeholder="Enter Username">
+  <input type="password" id="password" placeholder="Enter Password">
+
+  <button onclick="login()">Login</button>
+  <p id="error"></p>
+</div>
+
+<div id="mainPage" class="container">
+<h2>📡 Mobile Intelligence</h2>
+<input type="text" id="mobile" placeholder="Enter 10-digit Mobile Number">
+<button onclick="searchNumber()">Search</button>
+<table id="resultTable"></table>
+</div>
+
+<div id="adminPage" class="container">
+<h2>⚙️ Admin Dashboard</h2>
+<input type="text" id="newUser" placeholder="New Username">
+<input type="password" id="newPass" placeholder="New Password">
+<button onclick="createUser()">Create User</button>
+<ul id="userList"></ul>
+</div>
+
+<script>
+// ✅ Firebase Config (already provided)
+const firebaseConfig = {
+  apiKey: "AIzaSyD4o4uzcFWNAJeIA9rfm_LjpquoAXeGYoY",
+  authDomain: "number-details-3df24.firebaseapp.com",
+  databaseURL: "https://number-details-3df24-default-rtdb.firebaseio.com",
+  projectId: "number-details-3df24",
+  storageBucket: "number-details-3df24.appspot.com",
+  messagingSenderId: "311121919240",
+  appId: "1:311121919240:web:9279f9f4faeb759b3c80bd"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let attempts = {};
+let blocked = {};
+
+window.onload = () => {
+  loginBox.style.display = 'block';
+
+  // create admin only if not exists
+  db.ref("users/admin").once("value", snap => {
+    if (!snap.exists()) {
+      db.ref("users/admin").set("@AmJ@AdMin123");
+    }
+  });
+};
+
+function login() {
+  let u = username.value;
+  let p = password.value;
+
+  if (blocked[u] && Date.now() < blocked[u]) {
+    error.innerText = '⛔ Blocked 5 min';
+    return;
+  }
+
+  db.ref("users/" + u).once("value", snap => {
+    if (snap.exists() && snap.val() === p) {
+      loginBox.style.display = 'none';
+
+      if (u === 'admin') {
+        adminPage.style.display = 'block';
+        loadUsers();
+      } else {
+        mainPage.style.display = 'block';
+      }
+    } else {
+      attempts[u] = (attempts[u] || 0) + 1;
+      error.innerText = '❌ Wrong Login';
+
+      if (attempts[u] >= 3) {
+        blocked[u] = Date.now() + 5 * 60 * 1000;
+        error.innerText = '⛔ Blocked 5 min';
+      }
+    }
+  });
+}
+
+function createUser() {
+  let u = newUser.value;
+  let p = newPass.value;
+
+  db.ref("users/" + u).set(p);
+  loadUsers();
+}
+
+function deleteUser(u) {
+  if (u === 'admin') return alert('Cannot delete admin');
+  db.ref("users/" + u).remove();
+  loadUsers();
+}
+
+function loadUsers() {
+  userList.innerHTML = '';
+  db.ref("users").once("value", snap => {
+    snap.forEach(child => {
+      let u = child.key;
+      userList.innerHTML += `<li>👤 ${u} <button onclick="deleteUser('${u}')">❌</button></li>`;
+    });
+  });
+}
+
+async function searchNumber() {
+  let num = mobile.value;
+
+  if (!/^\d{10}$/.test(num)) {
+    alert('Enter valid 10-digit number');
+    return;
+  }
+
+  let url = `https://temp-api-bot-23276eb672ca.herokuapp.com/tapi-13e71563bf59b724319e21d33a8ba1b4?phone=${num}`;
+
+  resultTable.innerHTML = '<tr><td>🔍 Searching...</td></tr>';
+
+  try {
+    let res = await fetch(url);
+    let data = await res.json();
+
+    resultTable.innerHTML = '';
+
+    function renderRow(key, value) {
+      if (typeof value === 'object' && value !== null) {
+        for (let subKey in value) {
+          renderRow(key + ' → ' + subKey, value[subKey]);
+        }
+      } else {
+        resultTable.innerHTML += `<tr><th>${key}</th><td>${value}</td></tr>`;
+      }
+    }
+
+    for (let key in data) {
+      renderRow(key, data[key]);
+    }
+
+  } catch {
+    resultTable.innerHTML = '<tr><td>Error fetching data</td></tr>';
+  }
+}
+</script>
+
+</body>
+</html>
